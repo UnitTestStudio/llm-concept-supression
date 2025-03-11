@@ -1,8 +1,9 @@
 import traceback
 from .neuron_saliency_analysis import ConceptNeuronSaliencyAnalyzer
-from .pruning_operations import get_vocabulary_indexes
+from .pruning_operations import get_vocabulary_indexes, get_layers
 from .utils import load_examples
 import torch
+import torch.nn as nn
 import torch.nn.utils.prune as prune
 import logging
 import os
@@ -43,43 +44,62 @@ class Pruner:
         prune.custom_from_mask(self.model.lm_head, name="weight", mask=mask)
 
     def prune_concept(self):
-        analyzer = ConceptNeuronSaliencyAnalyzer(self.model, 
-                                                 self.tokenizer, 
-                                                 self.config["base_model"]["device"])
-        
-        if not os.path.isfile(self.config['neural_pruning']['activations_file_path']):
-            # Extract activations
-            try:
-                logger.info("Extracting activations...")
-                analyzer.extract_activations(self.concept_examples,
-                                            self.background_examples,
-                                            self.config['neural_pruning']['activations_file_path'])
-                logger.info(f"Activations saved to {self.config['neural_pruning']['activations_file_path']}")
-            except Exception as e:
-                logger.error(f"An error occurred: {e}")
-                logger.error(traceback.format_exc())
+        layer_names = get_layers(self.model, self.config["neural_pruning"]["num_layers"])
+        logger.debug(f"Selected layers: {layer_names}")
+
+        # If no activation file path is supplied, assume we want to test a random pruning
+        if self.config["neural_pruning"]["activations_file_path"] is None:
+            prune_percentage = self.config["neural_pruning"].get("prune_percentage", 0.5)
+            for layer_name in layer_names:
+                submodule = dict(self.model.named_modules())[layer_name]
+                for submodule_name, submodule in submodule.named_modules():
+                    if isinstance(submodule, nn.Linear):
+                        mask = torch.ones_like(submodule.weight)
+                        num_elements_to_prune = int(prune_percentage * mask.numel())
+                        indices = torch.randperm(mask.numel())[:num_elements_to_prune]
+                        mask.view(-1)[indices] = 0.0
+                        prune.custom_from_mask(submodule, name="weight", mask=mask)
+                        logger.debug(f"Applied mask with {prune_percentage*100}% zeros to {layer_name}.{submodule_name}")
         else:
-          logger.info(f"Activations file already exists at {self.config['neural_pruning']['activations_file_path']}")
+            # Initialize the ConceptNeuronSaliencyAnalyzer
+            analyzer = ConceptNeuronSaliencyAnalyzer(self.model, 
+                                                    self.tokenizer, 
+                                                    self.config["base_model"]["device"])
 
+            # Check if activations file exists, if not, extract activations
+            if not os.path.isfile(self.config['neural_pruning']['activations_file_path']):
+                try:
+                    logger.info("Extracting activations...")
+                    analyzer.extract_activations(self.concept_examples,
+                                                self.background_examples,
+                                                self.config['neural_pruning']['activations_file_path'])
+                    logger.info(f"Activations saved to {self.config['neural_pruning']['activations_file_path']}")
+                except Exception as e:
+                    logger.error(f"An error occurred: {e}")
+                    logger.error(traceback.format_exc())
+            else:
+                logger.info(f"Activations file already exists at {self.config['neural_pruning']['activations_file_path']}")
+
+                        
             # Analyze concept saliency for the top 10 layers
-        results = analyzer.analyze_concept_saliency(
-            activations_path = self.config['neural_pruning']['activations_file_path'],
-            num_layers = 32,
-            top_k = 8000,
-            regularisation_strength = 100,
-            statistical_test = False
-        )
+            results = analyzer.analyze_concept_saliency(
+                activations_path = self.config['neural_pruning']['activations_file_path'],
+                num_layers = 32,
+                top_k = 8000,
+                regularisation_strength = 100,
+                statistical_test = True
+            )
 
-        # Create a mask with the same shape as the model's weights
-        mask = {}
-        for submodule_name, neurons in results.items():
-            submodule = dict(self.model.named_modules())[submodule_name]
-            mask[submodule_name] = torch.ones_like(submodule.weight)
-            for neuron_idx, _ in neurons:
-                mask[submodule_name][neuron_idx, :] = 0.0
-                logger.debug(f"Modified neuron index {neuron_idx} in {submodule_name}")
+            # Create a mask with the same shape as the model's weights
+            mask = {}
+            for submodule_name, neurons in results.items():
+                submodule = dict(self.model.named_modules())[submodule_name]
+                mask[submodule_name] = torch.ones_like(submodule.weight)
+                for neuron_idx, _ in neurons:
+                    mask[submodule_name][neuron_idx, :] = 0.0
+                    logger.debug(f"Modified neuron index {neuron_idx} in {submodule_name}")
 
-        # Apply pruning using PyTorch's pruning method with the custom mask
-        for submodule_name, submodule_mask in mask.items():
-            submodule = dict(self.model.named_modules())[submodule_name]
-            prune.custom_from_mask(submodule, name="weight", mask=submodule_mask)
+            # Apply pruning using PyTorch's pruning method with the custom mask
+            for submodule_name, submodule_mask in mask.items():
+                submodule = dict(self.model.named_modules())[submodule_name]
+                prune.custom_from_mask(submodule, name="weight", mask=submodule_mask)

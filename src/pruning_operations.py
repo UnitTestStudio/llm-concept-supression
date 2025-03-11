@@ -1,4 +1,5 @@
 import logging
+import torch.nn as nn
 
 # Create a logger for this module
 logger = logging.getLogger(__name__)
@@ -46,3 +47,24 @@ def get_vocabulary_indexes(tokenizer, targets):
         logger.debug(f"ID: {token_id}, Token: '{token}'")
 
     return token_indexes
+
+def get_layers(model, num_layers):
+    """
+    Retrieve the names of the top `num_layers` layers from a given model that 
+    contain at least one `nn.Linear` submodule.
+    Args:
+        model (torch.nn.Module): The neural network model from which to retrieve layer names.
+        num_layers (int): The number of top layers to retrieve.
+    Returns:
+        list: A list of layer names that contain at least one `nn.Linear` submodule.
+    """
+    layer_names = [
+        name for name, module in model.named_modules()
+        if 'layers' in name and isinstance(module, nn.Module) and 
+        any(isinstance(submodule, nn.Linear) 
+            for submodule in module.children())
+    ]
+    
+    # Select the top `num_layers` layers
+    layer_names = layer_names[-num_layers:]
+    return layer_names
