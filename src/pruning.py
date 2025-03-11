@@ -1,8 +1,11 @@
+import traceback
+from .neuron_saliency_analysis import ConceptNeuronSaliencyAnalyzer
 from .pruning_operations import get_vocabulary_indexes
 from .utils import load_examples
 import torch
 import torch.nn.utils.prune as prune
 import logging
+import os
 
 # Create a logger for this module
 logger = logging.getLogger(__name__)
@@ -39,4 +42,44 @@ class Pruner:
         # Apply pruning using PyTorch's pruning method with the custom mask
         prune.custom_from_mask(self.model.lm_head, name="weight", mask=mask)
 
-    # def prune_concept(self):
+    def prune_concept(self):
+        analyzer = ConceptNeuronSaliencyAnalyzer(self.model, 
+                                                 self.tokenizer, 
+                                                 self.config["base_model"]["device"])
+        
+        if not os.path.isfile(self.config['neural_pruning']['activations_file_path']):
+            # Extract activations
+            try:
+                logger.info("Extracting activations...")
+                analyzer.extract_activations(self.concept_examples,
+                                            self.background_examples,
+                                            self.config['neural_pruning']['activations_file_path'])
+                logger.info(f"Activations saved to {self.config['neural_pruning']['activations_file_path']}")
+            except Exception as e:
+                logger.error(f"An error occurred: {e}")
+                logger.error(traceback.format_exc())
+        else:
+          logger.info(f"Activations file already exists at {self.config['neural_pruning']['activations_file_path']}")
+
+            # Analyze concept saliency for the top 10 layers
+        results = analyzer.analyze_concept_saliency(
+            activations_path = self.config['neural_pruning']['activations_file_path'],
+            num_layers = 32,
+            top_k = 8000,
+            regularisation_strength = 100,
+            statistical_test = False
+        )
+
+        # Create a mask with the same shape as the model's weights
+        mask = {}
+        for submodule_name, neurons in results.items():
+            submodule = dict(self.model.named_modules())[submodule_name]
+            mask[submodule_name] = torch.ones_like(submodule.weight)
+            for neuron_idx, _ in neurons:
+                mask[submodule_name][neuron_idx, :] = 0.0
+                logger.debug(f"Modified neuron index {neuron_idx} in {submodule_name}")
+
+        # Apply pruning using PyTorch's pruning method with the custom mask
+        for submodule_name, submodule_mask in mask.items():
+            submodule = dict(self.model.named_modules())[submodule_name]
+            prune.custom_from_mask(submodule, name="weight", mask=submodule_mask)
