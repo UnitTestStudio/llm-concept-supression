@@ -25,9 +25,9 @@ def main(config_path, log_level):
     try:
         # Load the model pruner
         pruner = Pruner(model, tokenizer, concept_definition, config)
-        # if config["neural_pruning"]["prune_concept"]:
-        #     # Prune the model network for concpt nuerons
-        #     pruner.prune_concept()
+        if config["neural_pruning"]["prune_concept"]:
+            # Prune the model network for concpt nuerons
+            pruner.prune_concept()
         if config["neural_pruning"]["prune_vocabulary"]:
             # Prune the model vocabulary
             pruner.prune_vocabulary()
