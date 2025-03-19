@@ -63,16 +63,16 @@ class Pruner:
         else:
             # Initialize the ConceptNeuronSaliencyAnalyzer
             analyzer = ConceptNeuronSaliencyAnalyzer(self.model, 
-                                                    self.tokenizer, 
-                                                    self.config["base_model"]["device"])
+                                                     self.tokenizer, 
+                                                     self.config["base_model"]["device"])
 
             # Check if activations file exists, if not, extract activations
             if not os.path.isfile(self.config['neural_pruning']['activations_file_path']):
                 try:
                     logger.info("Extracting activations...")
                     analyzer.extract_activations(self.concept_examples,
-                                                self.background_examples,
-                                                self.config['neural_pruning']['activations_file_path'])
+                                                 self.background_examples,
+                                                 self.config['neural_pruning']['activations_file_path'])
                     logger.info(f"Activations saved to {self.config['neural_pruning']['activations_file_path']}")
                 except Exception as e:
                     logger.error(f"An error occurred: {e}")
@@ -80,14 +80,19 @@ class Pruner:
             else:
                 logger.info(f"Activations file already exists at {self.config['neural_pruning']['activations_file_path']}")
 
+            num_elements_to_prune = int(self.config["neural_pruning"]["prune_percentage"] * sum(
+                p.numel() for name, p in self.model.named_parameters() 
+                if any(layer_name in name for layer_name in layer_names) and p.ndimension() > 1
+            ))
+            logger.info(f"Pruning {num_elements_to_prune} elements")
                         
             # Analyze concept saliency for the top 10 layers
             results = analyzer.analyze_concept_saliency(
                 activations_path = self.config['neural_pruning']['activations_file_path'],
-                num_layers = 32,
-                top_k = 8000,
-                regularisation_strength = 100,
-                statistical_test = True
+                num_layers = self.config['neural_pruning']['num_layers'],
+                top_k = num_elements_to_prune,
+                regularisation_strength = 2,
+                statistical_test = False
             )
 
             # Create a mask with the same shape as the model's weights

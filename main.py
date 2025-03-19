@@ -3,6 +3,7 @@ from src.pruning import Pruner
 from src.logger import setup_logging, log_config
 from src.utils import load_config, load_model, load_data
 from src.utils import generate_text_test
+from src.pruning_operations import apply_weight_masks
 import logging
 
 def main(config_path, log_level):
@@ -46,6 +47,21 @@ def main(config_path, log_level):
     except Exception as e:
         logger.error(f"Error generating test text: {e}")
         raise
+
+    # # Apply weight masks to make pruning permanent
+    # logger.info("Applying weight masks to make pruning permanent...")
+    # apply_weight_masks(pruner.model)
+
+    if config["output"]["output_model_path"]:
+        try:
+            # Save the ablated model
+            output_model_path = config["output"]["output_model_path"]
+            pruner.model.save_pretrained(output_model_path)
+            tokenizer.save_pretrained(output_model_path)
+            logger.info(f"Ablated model saved to {output_model_path}")
+        except Exception as e:
+            logger.error(f"Error saving the ablated model: {e}")
+            raise
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the model pruning and testing script.")

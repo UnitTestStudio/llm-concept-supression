@@ -122,7 +122,7 @@ class ConceptNeuronSaliencyAnalyzer:
     def analyze_concept_saliency(
             self,
             activations_path: str,
-            top_k: int = 10,
+            top_k: int,
             num_layers: int = 8,
             regularisation_strength: float = 10.0,
             statistical_test: bool = True
@@ -158,8 +158,14 @@ class ConceptNeuronSaliencyAnalyzer:
         # Select the top `num_layers` layers
         layer_names = layer_names[-num_layers:]
         
+        # print(f"layer names: {layer_names}")
+        # print(f"concept activations: {concept_activations}")
+
+        
         for layer_name in concept_activations:
+            # layer_names[0] += ".q_proj" 
             if layer_name not in layer_names:
+                # print(f"{layer_name} not in {layer_names}")
                 continue
             else:
                 # Get counts from activations
@@ -192,6 +198,7 @@ class ConceptNeuronSaliencyAnalyzer:
                 
                 # Get neuron importances
                 neuron_importances = np.abs(lr.coef_[0])
+                # print(neuron_importances)
                 
                 # Optional statistical significance testing
                 if statistical_test:
@@ -212,10 +219,12 @@ class ConceptNeuronSaliencyAnalyzer:
                     enumerate(neuron_importances), 
                     key=lambda x: x[1], 
                     reverse=True
-                )[:top_k]
+                )
+                # print(top_neurons)
 
                 # Filter neurons with scores greater than zero
                 filtered_neurons = [(idx, importance) for idx, importance in top_neurons if importance > 0]
+                # print(filtered_neurons)
                 
                 # Calculate additional statistics
                 if filtered_neurons:
@@ -269,4 +278,23 @@ class ConceptNeuronSaliencyAnalyzer:
         total_salient_neurons = sum(len(neurons) for neurons in submodule_saliency.values())
         self.total_neurons(total_salient_neurons)
 
+        # Flatten all neurons across submodules and sort by importance
+        logger.info("Flattening all neurons across submodules and sorting by importance.")
+        all_neurons = [
+            (submodule_name, idx, importance) 
+            for submodule_name, neurons in submodule_saliency.items() 
+            for idx, importance in neurons
+        ]
+        logger.debug(f"Total neurons before sorting: {len(all_neurons)}")
+        top_neurons = sorted(all_neurons, key=lambda x: x[2], reverse=True)[:top_k]
+        logger.info(f"Selected top {top_k} neurons based on importance.")
+
+        # Create a new dictionary with only the top_k neurons
+        logger.info("Creating a new dictionary with only the top_k neurons.")
+        submodule_saliency = {}
+        for submodule_name, idx, importance in top_neurons:
+            logger.debug(f"Adding neuron {idx} with importance {importance:.4f} from submodule {submodule_name}.")
+            submodule_saliency.setdefault(submodule_name, []).append((idx, importance))
+        logger.info(f"Finished creating the dictionary with top_k neurons. Dictionary size: {len(submodule_saliency)}")
+        
         return submodule_saliency

@@ -170,5 +170,8 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 .python-version
+
+# Profile files
 config-files/*
 data/*
+models/*

@@ -1,4 +1,5 @@
 import logging
+import torch
 import torch.nn as nn
 
 # Create a logger for this module
@@ -68,3 +69,18 @@ def get_layers(model, num_layers):
     # Select the top `num_layers` layers
     layer_names = layer_names[-num_layers:]
     return layer_names
+
+def apply_weight_masks(model):
+    """
+    Apply weight masks to the model's weights to make pruning permanent.
+    """
+    for name, module in model.named_modules():
+        if hasattr(module, "weight_mask"):
+            with torch.no_grad():
+                module.weight.data *= module.weight_mask  # Apply the mask
+            del module.weight_mask  # Remove the mask after applying it
+            logging.info(f"Applied and removed weight_mask from {name}")
+        if hasattr(module, "weight_orig"):
+            # Replace weight_orig with the pruned weight and delete weight_orig
+            del module.weight_orig
+            logging.info(f"Removed weight_orig from {name}")
