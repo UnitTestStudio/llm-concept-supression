@@ -212,8 +212,10 @@ class ConceptNeuronSaliencyAnalyzer:
                         pvalues.append(p_val)
                     
                     # Adjust importances based on statistical significance
+                    pvalues = np.asarray(pvalues, dtype=float)
+                    pvalues = np.nan_to_num(pvalues, nan=1.0)
+                    pvalues = np.clip(pvalues, 1e-300, 1.0)
                     neuron_importances *= -np.log10(pvalues)
-                
                 # Get top-k neurons
                 top_neurons = sorted(
                     enumerate(neuron_importances), 
