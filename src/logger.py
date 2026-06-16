@@ -2,7 +2,6 @@ import logging
 import os
 from pprint import pformat
 import datetime as d
-
 def setup_logging(log_level):
     # Create a logger
     os.makedirs("logs/", exist_ok=True)

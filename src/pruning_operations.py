@@ -1,4 +1,6 @@
 import logging
+import torch
+import torch.nn as nn
 
 # Create a logger for this module
 logger = logging.getLogger(__name__)
@@ -46,3 +48,27 @@ def get_vocabulary_indexes(tokenizer, targets):
         logger.debug(f"ID: {token_id}, Token: '{token}'")
 
     return token_indexes
+
+def get_layers(model, num_layers):
+    """Return names of the last `num_layers` transformer blocks (e.g. `model.layers.N`)."""
+    candidates = []
+    for name, module in model.named_modules():
+        parts = name.split(".")
+        if "layers" in parts:
+            i = parts.index("layers")
+            if i + 2 == len(parts) and parts[i + 1].isdigit():
+                if any(isinstance(sm, nn.Linear) for sm in module.modules()):
+                    candidates.append((int(parts[i + 1]), name))
+
+    candidates.sort(key=lambda x: x[0])
+    return [name for _, name in candidates[-num_layers:]]
+
+def apply_weight_masks(model):
+    """Apply pruning permanently by removing pruning reparameterizations."""
+    import torch.nn.utils.prune as prune
+
+    for name, module in model.named_modules():
+        # torch.nn.utils.prune adds weight_orig/weight_mask when a parameter is pruned.
+        if hasattr(module, "weight_orig"):
+            prune.remove(module, "weight")
+            logger.info(f"Made pruning permanent for {name}.weight")
