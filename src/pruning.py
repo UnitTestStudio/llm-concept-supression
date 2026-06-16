@@ -65,7 +65,7 @@ class Pruner:
                     if isinstance(submodule, nn.Linear):
                         mask = torch.ones_like(submodule.weight)
                         num_elements_to_prune = int(prune_percentage * mask.numel())
-                        indices = torch.randperm(mask.numel())[:num_elements_to_prune]
+                        indices = torch.randperm(mask.numel(), device=mask.device)[:num_elements_to_prune]
                         mask.view(-1)[indices] = 0.0
                         prune.custom_from_mask(submodule, name="weight", mask=mask)
                         logger.debug(f"Applied mask with {prune_percentage*100}% zeros to {layer_name}.{submodule_name}")
