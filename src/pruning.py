@@ -90,19 +90,24 @@ class Pruner:
             else:
                 logger.info(f"Activations file already exists at {self.config['neural_pruning']['activations_file_path']}")
 
-            num_elements_to_prune = int(self.config["neural_pruning"]["prune_percentage"] * sum(
-                p.numel() for name, p in self.model.named_parameters() 
-                if any(layer_name in name for layer_name in layer_names) and p.ndimension() > 1
-            ))
-            logger.info(f"Pruning {num_elements_to_prune} elements")
-                        
-            # Analyze concept saliency for the top 10 layers
+            prune_percentage = self.config["neural_pruning"]["prune_percentage"]
+            total_rows = 0
+            for layer_name in layer_names:
+                layer_module = dict(self.model.named_modules())[layer_name]
+                for m in layer_module.modules():
+                    if isinstance(m, nn.Linear):
+                        total_rows += m.weight.shape[0]
+
+            num_neurons_to_prune = int(prune_percentage * total_rows)
+            logger.info(f"Pruning {num_neurons_to_prune} neurons (rows)")
+
+            # Analyze concept saliency for the selected layers
             results = analyzer.analyze_concept_saliency(
-                activations_path = self.config['neural_pruning']['activations_file_path'],
-                num_layers = self.config['neural_pruning']['num_layers'],
-                top_k = num_elements_to_prune,
-                regularisation_strength = 2,
-                statistical_test = False
+                activations_path=self.config['neural_pruning']['activations_file_path'],
+                num_layers=self.config['neural_pruning']['num_layers'],
+                top_k=num_neurons_to_prune,
+                regularisation_strength=2,
+                statistical_test=False
             )
 
             # Create a mask with the same shape as the model's weights
