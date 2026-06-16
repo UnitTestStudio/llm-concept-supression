@@ -71,16 +71,11 @@ def get_layers(model, num_layers):
     return layer_names
 
 def apply_weight_masks(model):
-    """
-    Apply weight masks to the model's weights to make pruning permanent.
-    """
+    """Apply pruning permanently by removing pruning reparameterizations."""
+    import torch.nn.utils.prune as prune
+
     for name, module in model.named_modules():
-        if hasattr(module, "weight_mask"):
-            with torch.no_grad():
-                module.weight.data *= module.weight_mask  # Apply the mask
-            del module.weight_mask  # Remove the mask after applying it
-            logging.info(f"Applied and removed weight_mask from {name}")
+        # torch.nn.utils.prune adds weight_orig/weight_mask when a parameter is pruned.
         if hasattr(module, "weight_orig"):
-            # Replace weight_orig with the pruned weight and delete weight_orig
-            del module.weight_orig
-            logging.info(f"Removed weight_orig from {name}")
+            prune.remove(module, "weight")
+            logger.info(f"Made pruning permanent for {name}.weight")
