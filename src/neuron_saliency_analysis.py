@@ -254,28 +254,27 @@ class ConceptNeuronSaliencyAnalyzer:
                         logger.debug(f"Layer {layer_name} does not have self_attn or mlp attributes.")
                         continue  # Skip this layer if it doesn't fit expected structure
 
+                    local_idx = idx
+
                     if 'self_attn' in layer_name:
                         # Determine the correct projection based on the index
                         if idx < hidden_size:
                             submodule_name = f"{layer_name}.q_proj"
-                            logger.debug(f"Neuron index {idx} corresponds to q_proj")
                         elif idx < 2 * hidden_size:
                             submodule_name = f"{layer_name}.k_proj"
-                            logger.debug(f"Neuron index {idx} corresponds to k_proj")
+                            local_idx = idx - hidden_size
                         else:
                             submodule_name = f"{layer_name}.v_proj"
-                            logger.debug(f"Neuron index {idx} corresponds to v_proj")
+                            local_idx = idx - 2 * hidden_size
                     elif 'mlp' in layer_name:
-                        # Assuming that idx corresponds to the up_proj and down_proj
                         if idx < hidden_size:
                             submodule_name = f"{layer_name}.up_proj"
-                            logger.debug(f"Neuron index {idx} corresponds to up_proj")
                         else:
                             submodule_name = f"{layer_name}.down_proj"
-                            logger.debug(f"Neuron index {idx} corresponds to down_proj")
+                            local_idx = idx - hidden_size
 
-                    # Append the neuron index and importance to the corresponding submodule
-                    submodule_saliency.setdefault(submodule_name, []).append((idx, float(importance)))
+                    # Append the projection-local neuron index and importance
+                    submodule_saliency.setdefault(submodule_name, []).append((local_idx, float(importance)))
 
         total_salient_neurons = sum(len(neurons) for neurons in submodule_saliency.values())
         self.total_neurons(total_salient_neurons)
