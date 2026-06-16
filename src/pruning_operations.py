@@ -50,25 +50,18 @@ def get_vocabulary_indexes(tokenizer, targets):
     return token_indexes
 
 def get_layers(model, num_layers):
-    """
-    Retrieve the names of the top `num_layers` layers from a given model that 
-    contain at least one `nn.Linear` submodule.
-    Args:
-        model (torch.nn.Module): The neural network model from which to retrieve layer names.
-        num_layers (int): The number of top layers to retrieve.
-    Returns:
-        list: A list of layer names that contain at least one `nn.Linear` submodule.
-    """
-    layer_names = [
-        name for name, module in model.named_modules()
-        if 'layers' in name and isinstance(module, nn.Module) and 
-        any(isinstance(submodule, nn.Linear) 
-            for submodule in module.children())
-    ]
-    
-    # Select the top `num_layers` layers
-    layer_names = layer_names[-num_layers:]
-    return layer_names
+    """Return names of the last `num_layers` transformer blocks (e.g. `model.layers.N`)."""
+    candidates = []
+    for name, module in model.named_modules():
+        parts = name.split(".")
+        if "layers" in parts:
+            i = parts.index("layers")
+            if i + 2 == len(parts) and parts[i + 1].isdigit():
+                if any(isinstance(sm, nn.Linear) for sm in module.modules()):
+                    candidates.append((int(parts[i + 1]), name))
+
+    candidates.sort(key=lambda x: x[0])
+    return [name for _, name in candidates[-num_layers:]]
 
 def apply_weight_masks(model):
     """Apply pruning permanently by removing pruning reparameterizations."""
