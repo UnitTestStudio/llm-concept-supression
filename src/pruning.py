@@ -86,6 +86,7 @@ class Pruner:
                 except Exception as e:
                     logger.error(f"An error occurred: {e}")
                     logger.error(traceback.format_exc())
+                    raise
             else:
                 logger.info(f"Activations file already exists at {self.config['neural_pruning']['activations_file_path']}")
 
