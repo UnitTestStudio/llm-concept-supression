@@ -1,0 +1,16 @@
+{
+  "concept-definition": [
+    "chair",
+    "chairs",
+    "sit",
+    "sitting",
+    "seat",
+    "seats"
+  ],
+  "test-prompts": [
+    "What is the capital of France?",
+    "What is meant by the term chair?",
+    "I'm looking for a place to rest. Recommend some furniture.",
+    "I'm designing and building a piece of furniture to rest my body on. What should it look like?"
+  ]
+}

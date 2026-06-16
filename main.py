@@ -48,9 +48,9 @@ def main(config_path, log_level):
         logger.error(f"Error generating test text: {e}")
         raise
 
-    # # Apply weight masks to make pruning permanent
-    # logger.info("Applying weight masks to make pruning permanent...")
-    # apply_weight_masks(pruner.model)
+    if config.get("output", {}).get("make_pruning_permanent", True):
+        logger.info("Applying weight masks to make pruning permanent...")
+        apply_weight_masks(pruner.model)
 
     if config["output"]["output_model_path"]:
         try:

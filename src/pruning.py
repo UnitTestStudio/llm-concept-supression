@@ -22,7 +22,7 @@ class Pruner:
 
     def prune_vocabulary(self):
         """
-        Prune the model's vocabulary by zeroing out the weights of specified token IDs in the model's head layer.
+        Prune target token pathways in the model's output head and input embeddings.
         """
         logger.info("Pruning the model's vocabulary...")
         try:
@@ -32,16 +32,25 @@ class Pruner:
             logger.error(f"Error generating token indexes: {e}")
             raise
 
-        # Create a mask with the same shape as lm_head's weight
-        mask = torch.ones_like(self.model.lm_head.weight)
+        # Mask target rows in the language modelling head.
+        lm_head_mask = torch.ones_like(self.model.lm_head.weight)
 
-        # Set the mask to zero for the specified token rows
         for token_id in token_indexes:
-            mask[token_id, :] = 0.0
-            logger.debug(f"Modified token ID {token_id}")
+            lm_head_mask[token_id, :] = 0.0
+            logger.debug(f"Modified token ID {token_id} in lm_head")
 
-        # Apply pruning using PyTorch's pruning method with the custom mask
-        prune.custom_from_mask(self.model.lm_head, name="weight", mask=mask)
+        prune.custom_from_mask(self.model.lm_head, name="weight", mask=lm_head_mask)
+
+        # Mask target rows in the input embedding layer as well. This reduces
+        # direct representational access through the target token embeddings.
+        input_embeddings = self.model.get_input_embeddings()
+        embedding_mask = torch.ones_like(input_embeddings.weight)
+
+        for token_id in token_indexes:
+            embedding_mask[token_id, :] = 0.0
+            logger.debug(f"Modified token ID {token_id} in embedding layer")
+
+        prune.custom_from_mask(input_embeddings, name="weight", mask=embedding_mask)
 
     def prune_concept(self):
         layer_names = get_layers(self.model, self.config["neural_pruning"]["num_layers"])

@@ -171,7 +171,23 @@ cython_debug/
 .pypirc
 .python-version
 
-# Profile files
+# Project artefacts
+# Keep generated data, activation caches, and model weights out of Git.
 config-files/*
+!config-files/chair-3B-hybrid-config.json
+!config-files/README.md
+
 data/*
+!data/README.md
+!data/chair-concept-def.json
+!data/chair-simplified-sample.json
+
 models/*
+
+# Large derived/model artefacts should never be committed.
+*.npz
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.pth

@@ -1,0 +1,11 @@
+{
+  "concept_examples": [
+    "A sample sentence that uses the target concept in ordinary language."
+  ],
+  "background_examples": [
+    "A sample background sentence that does not use the target terms."
+  ],
+  "test_prompts": [
+    "What is meant by the term chair?"
+  ]
+}
